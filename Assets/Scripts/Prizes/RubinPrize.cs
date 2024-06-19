@@ -1,13 +1,15 @@
-﻿using System.Collections;
+﻿using Assets.Scripts.UICoillection;
+using System.Collections;
 using UnityEngine;
 
 namespace Assets.Scripts.Prizes
 {
-    public class RubinPrize : IPrizes
+    public class RubinPrize :  UIElement
     {
-        void IPrizes.Init()
+        public RubinPrize (string namees)
         {
-
+            transform.name = namees;
+            Debug.Log(namees);
         }
     }
 }
