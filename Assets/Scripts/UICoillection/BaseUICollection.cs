@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace Assets.Scripts.UICoillection
 {
-    public class UIContainer : BaseUICollection<UIElement> { }
     public abstract class BaseUICollection<T> : MonoBehaviour where T : UIElement
     {
         [SerializeField] private Transform _container;

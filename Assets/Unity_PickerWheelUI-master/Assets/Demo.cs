@@ -12,23 +12,23 @@ public class Demo : MonoBehaviour {
    private void Start () {
       uiSpinButton.onClick.AddListener (() => {
 
-         uiSpinButton.interactable = false ;
-         uiSpinButtonText.text = "Spinning" ;
-
-         pickerWheel.OnSpinEnd (wheelPiece => {
-            Debug.Log (
-               @" <b>Index:</b> " + wheelPiece.Index + "           <b>Label:</b> " + wheelPiece.Label
-               + "\n <b>Amount:</b> " + wheelPiece.Amount + "      <b>Chance:</b> " + wheelPiece.Chance + "%"
-            ) ;
-
-            uiSpinButton.interactable = true ;
-            uiSpinButtonText.text = "Spin" ;
-         }) ;
-
-         pickerWheel.Spin () ;
+          Spin();
 
       }) ;
 
    }
+
+    private void Spin()
+    {
+        uiSpinButton.interactable = false;
+        uiSpinButtonText.text = "Spinning";
+
+        pickerWheel.OnSpinEnd(wheelPiece => {
+            uiSpinButton.interactable = true;
+            uiSpinButtonText.text = "Spin";
+        });
+
+        pickerWheel.Spin();
+    }
 
 }

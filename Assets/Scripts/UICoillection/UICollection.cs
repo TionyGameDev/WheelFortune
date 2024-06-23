@@ -5,11 +5,12 @@ using UnityEngine;
 
 namespace Assets.Scripts.UICoillection
 {
-    public class UICollection : UIContainer
+    public class UICollection : BaseUICollection<UiDrawer>
     {
-        public List<UIElement> Draw(IEnumerable<object> objects)
+        public List<UiDrawer> Set(IEnumerable<object> objects)
         {
             Clear();
+
 
             if (objects == null) return null;
 
@@ -17,24 +18,28 @@ namespace Assets.Scripts.UICoillection
 
             if (objects == null || arr.Length == 0 || !HasElementPrefab()) return null;
 
-            List<UIElement> elements = new List<UIElement>();
+            List<UiDrawer> _uiDrawers = new List<UiDrawer>();
 
             for (var i = 0; i < arr.Length; i++)
             {
+                var data = arr[i];
+
+                if (data == null) continue;
+
                 //if (!prefab.CanDraw(arr[i])) continue;
 
                 var element = NewElement();
                 if (element)
                 {
                     AddElement(element);
-                    Debug.Log(arr[i]);
-                    element.Draw(arr[i]);
+                    element.Set(arr[i]);
+                    _uiDrawers.Add(element);
                 }
-                elements.Add(element);
             }
 
-            return elements;
-;
+            return _uiDrawers;
+
+            //LogWrapper.Log("elements: " + elements.Length);
         }
 
         bool CanDraw(object @object)

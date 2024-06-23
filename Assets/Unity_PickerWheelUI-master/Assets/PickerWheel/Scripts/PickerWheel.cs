@@ -1,225 +1,273 @@
-﻿using UnityEngine ;
-using UnityEngine.UI ;
-using DG.Tweening ;
-using UnityEngine.Events ;
-using System.Collections.Generic ;
-
-namespace EasyUI.PickerWheelUI {
-
-   public class PickerWheel : MonoBehaviour {
-
-      [Header ("References :")]
-      [SerializeField] private GameObject linePrefab ;
-      [SerializeField] private Transform linesParent ;
-
-      [Space]
-      [SerializeField] private Transform PickerWheelTransform ;
-      [SerializeField] private Transform wheelCircle ;
-      [SerializeField] private GameObject wheelPiecePrefab ;
-      [SerializeField] private Transform wheelPiecesParent ;
-
-      [Space]
-      [Header ("Sounds :")]
-      [SerializeField] private AudioSource audioSource ;
-      [SerializeField] private AudioClip tickAudioClip ;
-      [SerializeField] [Range (0f, 1f)] private float volume = .5f ;
-      [SerializeField] [Range (-3f, 3f)] private float pitch = 1f ;
-
-      [Space]
-      [Header ("Picker wheel settings :")]
-      [Range (1, 20)] public int spinDuration = 8 ;
-      [SerializeField] [Range (.2f, 2f)] private float wheelSize = 1f ;
-
-      [Space]
-      [Header ("Picker wheel pieces :")]
-      public WheelPiece[] wheelPieces ;
-
-      // Events
-      private UnityAction onSpinStartEvent ;
-      private UnityAction<WheelPiece> onSpinEndEvent ;
+﻿using Assets.Scripts.Prizes;
+using Assets.Scripts.Wheel;
+using DG.Tweening;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.UI;
 
 
-      private bool _isSpinning = false ;
+namespace EasyUI.PickerWheelUI
+{
 
-      public bool IsSpinning { get { return _isSpinning ; } }
+    public enum WheelState
+    {
+        Cooldowm,
+        Active,
+        DrawPrizes
+    }
+    public class PickerWheel : MonoBehaviour
+    {
+        [SerializeField]
+        private WheelStateUI _currentState;
 
+        [SerializeField]
+        private Button _buttonSpin;
 
-      private Vector2 pieceMinSize = new Vector2 (81f, 146f) ;
-      private Vector2 pieceMaxSize = new Vector2 (144f, 213f) ;
-      private int piecesMin = 2 ;
-      private int piecesMax = 12 ;
-
-      private float pieceAngle ;
-      private float halfPieceAngle ;
-      private float halfPieceAngleWithPaddings ;
-
-
-      private double accumulatedWeight ;
-      private System.Random rand = new System.Random () ;
-
-      private List<int> nonZeroChancesIndices = new List<int> () ;
-
-      private void Start () {
-         pieceAngle = 360 / wheelPieces.Length ;
-         halfPieceAngle = pieceAngle / 2f ;
-         halfPieceAngleWithPaddings = halfPieceAngle - (halfPieceAngle / 4f) ;
-
-         Generate () ;  
-
-         CalculateWeightsAndIndices () ;
-         if (nonZeroChancesIndices.Count == 0)
-            Debug.LogError ("You can't set all pieces chance to zero") ;
+        [SerializeField] private Transform PickerWheelTransform;
+        [SerializeField] private Transform wheelCircle;
+        [SerializeField] private RubinPrize wheelPiecePrefab;
+        [SerializeField] private Transform wheelPiecesParent;
+        [SerializeField] private Image _mainItems;
+        [SerializeField] private int _cooldown;
+        public int _cooldownNumber;
+        [SerializeField] private int spinDuration = 8;
 
 
-         SetupAudio () ;
+        [SerializeField]
+        private List<WheelPiece> wheelPieces = new List<WheelPiece>();
 
-      }
+        [SerializeField]
+        private List<Sprite> _icons;
 
-      private void SetupAudio () {
-         audioSource.clip = tickAudioClip ;
-         audioSource.volume = volume ;
-         audioSource.pitch = pitch ;
-      }
+        private UnityAction onSpinStartEvent;
+        public UnityAction<WheelPiece> onSpinEndEvent;
+        [SerializeField]
+        private bool _isSpinning = false;
 
-      private void Generate () {
-         wheelPiecePrefab = InstantiatePiece () ;
-
-         RectTransform rt = wheelPiecePrefab.transform.GetChild (0).GetComponent <RectTransform> () ;
-         float pieceWidth = Mathf.Lerp (pieceMinSize.x, pieceMaxSize.x, 1f - Mathf.InverseLerp (piecesMin, piecesMax, wheelPieces.Length)) ;
-         float pieceHeight = Mathf.Lerp (pieceMinSize.y, pieceMaxSize.y, 1f - Mathf.InverseLerp (piecesMin, piecesMax, wheelPieces.Length)) ;
-         rt.SetSizeWithCurrentAnchors (RectTransform.Axis.Horizontal, pieceWidth) ;
-         rt.SetSizeWithCurrentAnchors (RectTransform.Axis.Vertical, pieceHeight) ;
-
-         for (int i = 0; i < wheelPieces.Length; i++)
-            DrawPiece (i) ;
-
-         Destroy (wheelPiecePrefab) ;
-      }
-
-      private void DrawPiece (int index) {
-         WheelPiece piece = wheelPieces [ index ] ;
-         Transform pieceTrns = InstantiatePiece ().transform.GetChild (0) ;
-
-         pieceTrns.GetChild (0).GetComponent <Image> ().sprite = piece.Icon ;
-         pieceTrns.GetChild (1).GetComponent <Text> ().text = piece.Label ;
-         pieceTrns.GetChild (2).GetComponent <Text> ().text = piece.Amount.ToString () ;
-
-         //Line
-         Transform lineTrns = Instantiate (linePrefab, linesParent.position, Quaternion.identity, linesParent).transform ;
-         lineTrns.RotateAround (wheelPiecesParent.position, Vector3.back, (pieceAngle * index) + halfPieceAngle) ;
-
-         pieceTrns.RotateAround (wheelPiecesParent.position, Vector3.back, pieceAngle * index) ;
-      }
-
-      private GameObject InstantiatePiece () {
-         return Instantiate (wheelPiecePrefab, wheelPiecesParent.position, Quaternion.identity, wheelPiecesParent) ;
-      }
+        public bool IsSpinning { get { return _isSpinning; } }
 
 
-      public void Spin () {
-         if (!_isSpinning) {
-            _isSpinning = true ;
-            if (onSpinStartEvent != null)
-               onSpinStartEvent.Invoke () ;
+        private Vector2 pieceMinSize = new Vector2(81f, 146f);
+        private Vector2 pieceMaxSize = new Vector2(144f, 213f);
+        private int piecesMin = 2;
+        private int piecesMax = 12;
 
-            int index = GetRandomPieceIndex () ;
-            WheelPiece piece = wheelPieces [ index ] ;
+        private float pieceAngle;
+        private float halfPieceAngle;
+        private float halfPieceAngleWithPaddings;
 
-            if (piece.Chance == 0 && nonZeroChancesIndices.Count != 0) {
-               index = nonZeroChancesIndices [ Random.Range (0, nonZeroChancesIndices.Count) ] ;
-               piece = wheelPieces [ index ] ;
+
+        private double accumulatedWeight;
+
+        private void Start()
+        {
+            wheelPieces.Clear();
+            wheelPieces.AddRange(new WheelPiece[piecesMax]);
+
+            pieceAngle = 360 / wheelPieces.Count;
+            halfPieceAngle = pieceAngle / 2f;
+            halfPieceAngleWithPaddings = halfPieceAngle - (halfPieceAngle / 4f);
+            _cooldownNumber = _cooldown;
+
+            if (_currentState)
+            {
+                _currentState.onChangeValue += OnSwitchState;
+                _currentState.Init(WheelState.Cooldowm);               
             }
 
-            float angle = -(pieceAngle * index) ;
+            Generate();
 
-            float rightOffset = (angle - halfPieceAngleWithPaddings) % 360 ;
-            float leftOffset = (angle + halfPieceAngleWithPaddings) % 360 ;
+            _buttonSpin.onClick.AddListener(Spin);
+        }
 
-            float randomAngle = Random.Range (leftOffset, rightOffset) ;
+        public void OnSwitchState(WheelState state)
+        {
+            Debug.Log("STATE" + state);
+            switch (state)
+            {
+                case WheelState.Active:
+                    WheelActive();
+                    break;
+                case WheelState.Cooldowm:
+                    Cooldown();
+                    break;
+                case WheelState.DrawPrizes:
+                    DrawPrizes();
+                    break;
+            }
+        }
 
-            Vector3 targetRotation = Vector3.back * (randomAngle + 2 * 360 * spinDuration) ;
+        private void DrawPrizes()
+        {
+            _isSpinning = false;
+            onSpinEndEvent.Invoke(_piece);
+        }
 
-            //float prevAngle = wheelCircle.eulerAngles.z + halfPieceAngle ;
-            float prevAngle, currentAngle ;
-            prevAngle = currentAngle = wheelCircle.eulerAngles.z ;
+        [ContextMenu("DRAW")]
+        public async void Cooldown()
+        {
+            Debug.Log("Cooldoown");
+            await Task.Delay(1000);
+            DrawNumber();
 
-            bool isIndicatorOnTheLine = false ;
+            if (_cooldownNumber > 0)
+            {
+                Debug.Log("Cooldoo - 1");
+                _cooldownNumber -= 1;
+                Cooldown();
+            }
+            else
+            {
+                Debug.Log("ELSE");
+                _cooldownNumber = _cooldown;
+                _currentState.SetState(WheelState.Active);
+            }
+        }
 
-            wheelCircle
-            .DORotate (targetRotation, spinDuration, RotateMode.Fast)
-            .SetEase (Ease.InOutQuart)
-            .OnUpdate (() => {
-               float diff = Mathf.Abs (prevAngle - currentAngle) ;
-               if (diff >= halfPieceAngle) {
-                  if (isIndicatorOnTheLine) {
-                     audioSource.PlayOneShot (audioSource.clip) ;
-                  }
-                  prevAngle = currentAngle ;
-                  isIndicatorOnTheLine = !isIndicatorOnTheLine ;
-               }
-               currentAngle = wheelCircle.eulerAngles.z ;
-            })
-            .OnComplete (() => {
-               _isSpinning = false ;
-               if (onSpinEndEvent != null)
-                  onSpinEndEvent.Invoke (piece) ;
+        private void WheelActive()
+        {
+            Debug.Log("WheelActive");
+            //Spin();
+        }
 
-               onSpinStartEvent = null ; 
-               onSpinEndEvent = null ;
-            }) ;
+        private void DrawNumber()
+        {
+            Debug.Log(wheelPieces.Count + " wheelPieces");
+            for (int i = 0; i < _prizes.Count; i++)
+            {
+                var pieces = _prizes[i];               
+                pieces.amount = UnityEngine.Random.Range(0, 100);
+                _prizes[i].Draw(pieces.amount.ToString());
+            }
+            if (_mainItems)
+                _mainItems.sprite = _icons[UnityEngine.Random.Range(0,_icons.Count - 1)];
+        }
 
-         }
-      }
+        private async void Generate()
+        {
+            for (int i = 0; i < wheelPieces.Count; i++)
+                DrawPiece(i);
 
-      private void FixedUpdate () {
+            await Task.Delay(500);
+            DrawNumber();
+        }
 
-      }
+        [SerializeField]
+        private List<RubinPrize> _prizes = new List<RubinPrize>();
+        private void DrawPiece(int index)
+        {
+            RubinPrize pieceTrns = InstantiatePiece();
 
-      public void OnSpinStart (UnityAction action) {
-         onSpinStartEvent = action ;
-      }
+            if (pieceTrns)
+            {
+                pieceTrns.transform.RotateAround(wheelPiecesParent.position, Vector3.back, pieceAngle * index);
+                _prizes.Add(pieceTrns);
+            }
+        }
 
-      public void OnSpinEnd (UnityAction<WheelPiece> action) {
-         onSpinEndEvent = action ;
-      }
+        private RubinPrize InstantiatePiece()
+        {
+            return Instantiate(wheelPiecePrefab, wheelPiecesParent.position, Quaternion.identity, wheelPiecesParent);
+        }
 
+        WheelPiece _piece;
 
-      private int GetRandomPieceIndex () {
-         double r = rand.NextDouble () * accumulatedWeight ;
+        public void Spin()
+        {
+            Debug.Log(_currentState.GetState().ToString());
+            if (!_isSpinning && _currentState.GetState() == WheelState.Active)
+            {
+                _isSpinning = true;
 
-         for (int i = 0; i < wheelPieces.Length; i++)
-            if (wheelPieces [ i ]._weight >= r)
-               return i ;
+                if (onSpinStartEvent != null)
+                    onSpinStartEvent.Invoke();
 
-         return 0 ;
-      }
+                int index = GetRandomPieceIndex();
+                _piece  = wheelPieces[index];
 
-      private void CalculateWeightsAndIndices () {
-         for (int i = 0; i < wheelPieces.Length; i++) {
-            WheelPiece piece = wheelPieces [ i ] ;
-
-            //add weights:
-            accumulatedWeight += piece.Chance ;
-            piece._weight = accumulatedWeight ;
-
-            //add index :
-            piece.Index = i ;
-
-            //save non zero chance indices:
-            if (piece.Chance > 0)
-               nonZeroChancesIndices.Add (i) ;
-         }
-      }
+                index = UnityEngine.Random.Range(0, wheelPieces.Count);
+                _piece = wheelPieces[index];
 
 
+                float angle = -(pieceAngle * index);
+
+                float rightOffset = (angle - halfPieceAngleWithPaddings) % 360;
+                float leftOffset = (angle + halfPieceAngleWithPaddings) % 360;
+
+                float randomAngle = UnityEngine.Random.Range(leftOffset, rightOffset);
+
+                Vector3 targetRotation = Vector3.back * (randomAngle + 2 * 360 * spinDuration);
+
+                //float prevAngle = wheelCircle.eulerAngles.z + halfPieceAngle ;
+                float prevAngle, currentAngle;
+                prevAngle = currentAngle = wheelCircle.eulerAngles.z;
+
+                bool isIndicatorOnTheLine = false;
+
+                wheelCircle
+                .DORotate(targetRotation, spinDuration, RotateMode.Fast)
+                .SetEase(Ease.InOutQuart)
+                .OnUpdate(() => {
+                    float diff = Mathf.Abs(prevAngle - currentAngle);
+                    if (diff >= halfPieceAngle)
+                    {
+                        if (isIndicatorOnTheLine)
+                        {
+                            // audioSource.PlayOneShot (audioSource.clip) ;
+                        }
+                        prevAngle = currentAngle;
+                        isIndicatorOnTheLine = !isIndicatorOnTheLine;
+                    }
+                    currentAngle = wheelCircle.eulerAngles.z;
+                })
+                .OnComplete(() => {
+                    _currentState.SetState(WheelState.DrawPrizes);
+                });
+
+            }
+        }
+        public void OnSpinStart(UnityAction action)
+        {
+            onSpinStartEvent = action;
+        }
+
+        public void OnSpinEnd(UnityAction<WheelPiece> action)
+        {
+            onSpinEndEvent += action;
+        }
 
 
-      private void OnValidate () {
-         if (PickerWheelTransform != null)
-            PickerWheelTransform.localScale = new Vector3 (wheelSize, wheelSize, 1f) ;
+        private int GetRandomPieceIndex()
+        {
+            int v = UnityEngine.Random.RandomRange(0, piecesMax - 1);
+            return v;
 
-         if (wheelPieces.Length > piecesMax || wheelPieces.Length < piecesMin)
-            Debug.LogError ("[ PickerWheelwheel ]  pieces length must be between " + piecesMin + " and " + piecesMax) ;
-      }
-   }
+            //double r = rand.NextDouble();
+
+            //for (int i = 0; i < wheelPieces.Count; i++)
+                //if (wheelPieces[i]._weight >= r)
+                    //return i;
+
+        }
+
+        private void CalculateWeightsAndIndices()
+        {
+            for (int i = 0; i < wheelPieces.Count; i++)
+            {
+                WheelPiece piece = wheelPieces[i];
+
+                //add weights:
+                //'piece._weight = accumulatedWeight;
+
+                //add index :
+                //piece.Index = i;
+
+                //save non zero chance indices:
+            }
+        }        
+    }
 }

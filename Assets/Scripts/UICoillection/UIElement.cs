@@ -22,7 +22,7 @@ namespace Assets.Scripts.UICoillection
 
         public void Draw(object obj)
         {
-            Debug.Log(obj);
+            
         }
 
     }
